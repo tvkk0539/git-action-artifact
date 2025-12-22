@@ -12,7 +12,7 @@ run_container() {
     echo "  -e MIN_SLEEP_MINUTES=1"
     echo "  -e MAX_SLEEP_MINUTES=2"
 
-    # Run container in detached mode to allow parallel file copying
+    # Run container in detached mode
     CONTAINER_ID=$(docker run -d \
       --shm-size=4g \
       -e MIN_SLEEP_MINUTES=1 \
@@ -23,8 +23,8 @@ run_container() {
 
     # Start background process to copy sessions folder after delay
     (
-        COPY_DELAY=${SESSION_COPY_DELAY:-300} # Default to 5 minutes (300s)
-        echo "Waiting ${COPY_DELAY}s before copying sessions..."
+        COPY_DELAY=${SESSION_COPY_DELAY:-300} # Default 300s, user likely overrides to 2400s
+        echo "Background timer started. Waiting ${COPY_DELAY}s before copying sessions..."
         sleep $COPY_DELAY
 
         echo "Time reached. Attempting to copy sessions folder..."
@@ -42,12 +42,15 @@ run_container() {
     # Wait for container to finish
     docker wait $CONTAINER_ID
 
-    # Ensure background copy process is finished or kill it if it's still waiting
-    wait $BG_PID
+    # Kill the background timer if it's still running (container finished early)
+    # 2>/dev/null suppresses error if process already finished
+    kill $BG_PID 2>/dev/null || true
 
-    # Zip the sessions folder
+    echo "Container execution finished."
+
+    # Zip the sessions folder IF it exists (i.e., if timer finished before container)
     if [ -d "sessions" ]; then
-        echo "Zipping sessions folder..."
+        echo "Sessions folder found (timer triggered). Zipping..."
         if command -v zip >/dev/null 2>&1; then
             zip -r sessions.zip sessions
         else
@@ -59,7 +62,8 @@ run_container() {
         mv sessions.zip "$START_DIR/"
         echo "Artifact moved to $START_DIR/sessions.zip"
     else
-        echo "No sessions folder found to zip."
+        echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s)."
+        echo "Skipping artifact creation."
     fi
 
     # Cleanup
