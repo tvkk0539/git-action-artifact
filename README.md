@@ -33,6 +33,7 @@ You can configure the behavior using Environment Variables.
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
+| `ENABLE_SESSION_UPLOAD`| Set to `true` to enable session artifact upload. Set to `false` to disable. | `false` (in script), `true` (in workflow) |
 | `SESSION_COPY_DELAY` | Time in seconds to wait after container start before copying the sessions folder. | `300` (5 minutes) |
 | `MIN_SLEEP_MINUTES` | passed to container | `1` |
 | `MAX_SLEEP_MINUTES` | passed to container | `2` |
