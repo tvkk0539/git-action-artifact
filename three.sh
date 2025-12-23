@@ -4,6 +4,77 @@ set -e
 # Capture starting directory
 START_DIR=$(pwd)
 
+# Default variables
+ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
+RESTORE_URL=${SESSION_RESTORE_URL_THREE:-""}
+MOUNT_ARG=""
+
+# --- Logic for Session Restore ---
+if [ "$ENABLE_RESTORE" = "true" ]; then
+    echo "=== Session Restore Feature ENABLED ==="
+
+    if [ -z "$RESTORE_URL" ]; then
+        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_THREE is missing!"
+        exit 1
+    fi
+
+    echo "Downloading sessions from: $RESTORE_URL"
+    # Create a temporary directory for extraction
+    mkdir -p temp_restore
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -L -o temp_restore/downloaded.zip "$RESTORE_URL"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -O temp_restore/downloaded.zip "$RESTORE_URL"
+    else
+        echo "ERROR: Neither curl nor wget found. Cannot download sessions."
+        exit 1
+    fi
+
+    echo "Unzipping downloaded file..."
+    # 1. Unzip the main artifact (e.g., sessions-zip.zip)
+    unzip -q temp_restore/downloaded.zip -d temp_restore/step1
+
+    # 2. Find the inner zip (sessions.zip)
+    # The structure described: sessions-zip/sessions.zip
+    INNER_ZIP=$(find temp_restore/step1 -name "sessions.zip" | head -n 1)
+
+    if [ -z "$INNER_ZIP" ]; then
+        echo "ERROR: Could not find 'sessions.zip' inside the downloaded artifact."
+        echo "Contents of download:"
+        ls -R temp_restore/step1
+        exit 1
+    fi
+
+    echo "Found inner zip: $INNER_ZIP"
+    unzip -q "$INNER_ZIP" -d temp_restore/step2
+
+    # 3. Find the final 'sessions' folder
+    # The structure described: .../sessions/sessions/
+    FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
+
+    if [ -z "$FINAL_SESSIONS_DIR" ]; then
+         echo "ERROR: Could not find a 'sessions' directory inside the inner zip."
+         ls -R temp_restore/step2
+         exit 1
+    fi
+
+    echo "Found sessions directory: $FINAL_SESSIONS_DIR"
+
+    # Move it to a clean location for mounting
+    rm -rf final_sessions
+    mv "$FINAL_SESSIONS_DIR" ./final_sessions
+
+    echo "Ready to mount ./final_sessions to container."
+    MOUNT_ARG="-v $(pwd)/final_sessions:/usr/src/microsoft-rewards-script/dist/browser/sessions"
+
+    # Cleanup temp
+    rm -rf temp_restore
+else
+    echo "Session Restore Feature DISABLED."
+fi
+
+
 # Common function to run container (defined FIRST)
 run_container() {
     echo -e "\n=== Running Container ==="
@@ -12,11 +83,16 @@ run_container() {
     echo "  -e MIN_SLEEP_MINUTES=1"
     echo "  -e MAX_SLEEP_MINUTES=2"
 
+    if [ -n "$MOUNT_ARG" ]; then
+        echo "  $MOUNT_ARG"
+    fi
+
     # Run container in detached mode
     CONTAINER_ID=$(docker run -d \
       --shm-size=4g \
       -e MIN_SLEEP_MINUTES=1 \
       -e MAX_SLEEP_MINUTES=2 \
+      $MOUNT_ARG \
       myimage:latest)
 
     echo "Container started with ID: $CONTAINER_ID"
@@ -77,6 +153,9 @@ run_container() {
     # Cleanup
     echo "Cleaning up container..."
     docker rm -f $CONTAINER_ID || true
+
+    # Cleanup restore folder if it exists
+    rm -rf final_sessions
 }
 
 # Clone target repo
