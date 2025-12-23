@@ -22,7 +22,8 @@ The scripts are designed to extract valuable session data from the running conta
 ### 2. Session Restore (New)
 You can restore a previously saved sessions folder into the container at startup.
 *   **Enable**: Set `ENABLE_SESSION_RESTORE` to `true`.
-*   **Source**: Provide the download URL via `SESSION_RESTORE_URL_ONE`, `_TWO`, or `_THREE`.
+*   **Source**: Provide the download URL via `SESSION_RESTORE_URL_ONE`, `_TWO`, or `_THREE` in GitHub Secrets.
+    *   **Fallback**: You can also edit `one.sh`, `two.sh`, or `three.sh` and set the `HARDCODED_RESTORE_URL` variable directly in the script.
 *   **Process**: The script downloads the zip, handles the nested structure (`sessions-zip/sessions.zip/sessions`), and mounts it to the container at `/usr/src/microsoft-rewards-script/dist/browser/sessions`.
 *   **Note**: When Restore is enabled, Upload should generally be disabled (or will effectively be disabled if you set the toggle).
 

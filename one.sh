@@ -6,7 +6,12 @@ START_DIR=$(pwd)
 
 # Default variables
 ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
-RESTORE_URL=${SESSION_RESTORE_URL_ONE:-""}
+
+# You can paste your URL directly here inside the quotes as a fallback
+HARDCODED_RESTORE_URL=""
+
+# Use Secret if available, otherwise use Hardcoded
+RESTORE_URL=${SESSION_RESTORE_URL_ONE:-$HARDCODED_RESTORE_URL}
 MOUNT_ARG=""
 
 # --- Logic for Session Restore ---
@@ -14,7 +19,7 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     echo "=== Session Restore Feature ENABLED ==="
 
     if [ -z "$RESTORE_URL" ]; then
-        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_ONE is missing!"
+        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_ONE (Secret) and HARDCODED_RESTORE_URL are both empty!"
         exit 1
     fi
 
@@ -37,7 +42,6 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
 
     # 2. Find the inner zip (sessions.zip)
     # The structure described: sessions-zip/sessions.zip
-    # We find any zip file inside step1
     INNER_ZIP=$(find temp_restore/step1 -name "sessions.zip" | head -n 1)
 
     if [ -z "$INNER_ZIP" ]; then
@@ -52,7 +56,6 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
 
     # 3. Find the final 'sessions' folder
     # The structure described: .../sessions/sessions/
-    # We search for a directory named "sessions"
     FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
 
     if [ -z "$FINAL_SESSIONS_DIR" ]; then
@@ -90,7 +93,6 @@ run_container() {
     fi
 
     # Run container in detached mode
-    # We use $MOUNT_ARG which is empty if restore is disabled, or contains -v ... if enabled
     CONTAINER_ID=$(docker run -d \
       --shm-size=4g \
       -e MIN_SLEEP_MINUTES=1 \
