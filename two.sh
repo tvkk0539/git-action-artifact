@@ -12,7 +12,7 @@ run_container() {
     echo "  -e MIN_SLEEP_MINUTES=1"
     echo "  -e MAX_SLEEP_MINUTES=2"
 
-    # Run container in detached mode to allow parallel file copying
+    # Run container in detached mode
     CONTAINER_ID=$(docker run -d \
       --shm-size=4g \
       -e MIN_SLEEP_MINUTES=1 \
@@ -21,20 +21,25 @@ run_container() {
 
     echo "Container started with ID: $CONTAINER_ID"
 
-    # Start background process to copy sessions folder after delay
-    (
-        COPY_DELAY=${SESSION_COPY_DELAY:-300} # Default to 5 minutes (300s)
-        echo "Waiting ${COPY_DELAY}s before copying sessions..."
-        sleep $COPY_DELAY
+    # Start background process to copy sessions folder after delay (ONLY IF ENABLED)
+    BG_PID=""
+    if [ "$ENABLE_SESSION_UPLOAD" = "true" ]; then
+        (
+            COPY_DELAY=${SESSION_COPY_DELAY:-300} # Default 300s
+            echo "Background timer started. Waiting ${COPY_DELAY}s before copying sessions..."
+            sleep $COPY_DELAY
 
-        echo "Time reached. Attempting to copy sessions folder..."
-        if docker cp "$CONTAINER_ID:/usr/src/microsoft-rewards-script/dist/browser/sessions" ./sessions; then
-            echo "Successfully copied sessions folder."
-        else
-            echo "Failed to copy sessions folder (container might be gone or path invalid)."
-        fi
-    ) &
-    BG_PID=$!
+            echo "Time reached. Attempting to copy sessions folder..."
+            if docker cp "$CONTAINER_ID:/usr/src/microsoft-rewards-script/dist/browser/sessions" ./sessions; then
+                echo "Successfully copied sessions folder."
+            else
+                echo "Failed to copy sessions folder (container might be gone or path invalid)."
+            fi
+        ) &
+        BG_PID=$!
+    else
+        echo "Session upload feature is DISABLED. Skipping background timer."
+    fi
 
     # Stream logs to console so we can see what's happening
     docker logs -f $CONTAINER_ID
@@ -42,24 +47,31 @@ run_container() {
     # Wait for container to finish
     docker wait $CONTAINER_ID
 
-    # Ensure background copy process is finished or kill it if it's still waiting
-    wait $BG_PID
+    # Kill the background timer if it was started and is still running
+    if [ -n "$BG_PID" ]; then
+        kill $BG_PID 2>/dev/null || true
+    fi
 
-    # Zip the sessions folder
-    if [ -d "sessions" ]; then
-        echo "Zipping sessions folder..."
-        if command -v zip >/dev/null 2>&1; then
-            zip -r sessions.zip sessions
+    echo "Container execution finished."
+
+    # Zip the sessions folder IF enabled AND it exists
+    if [ "$ENABLE_SESSION_UPLOAD" = "true" ]; then
+        if [ -d "sessions" ]; then
+            echo "Sessions folder found (timer triggered). Zipping..."
+            if command -v zip >/dev/null 2>&1; then
+                zip -r sessions.zip sessions
+            else
+                echo "zip command not found, trying tar..."
+                tar -czf sessions.zip sessions
+            fi
+
+            # Move artifact to start dir
+            mv sessions.zip "$START_DIR/"
+            echo "Artifact moved to $START_DIR/sessions.zip"
         else
-            echo "zip command not found, trying tar..."
-            tar -czf sessions.zip sessions
+            echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s) or copy failed."
+            echo "Skipping artifact creation."
         fi
-
-        # Move artifact to start dir
-        mv sessions.zip "$START_DIR/"
-        echo "Artifact moved to $START_DIR/sessions.zip"
-    else
-        echo "No sessions folder found to zip."
     fi
 
     # Cleanup

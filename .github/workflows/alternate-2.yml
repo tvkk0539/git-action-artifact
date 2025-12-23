@@ -142,7 +142,8 @@ jobs:
       - name: Run cyclic Docker script
         if: env.SHOULD_RUN == 'true'
         env:
-          SESSION_COPY_DELAY: 300 # Wait 5 minutes before copying sessions (adjust as needed)
+          SESSION_COPY_DELAY: 2400 # Wait 40 minutes before copying sessions
+          ENABLE_SESSION_UPLOAD: 'true' # Set to 'false' to disable artifact upload
         run: ./script.sh
 
       - name: Upload Sessions Artifact
