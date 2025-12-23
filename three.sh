@@ -6,7 +6,12 @@ START_DIR=$(pwd)
 
 # Default variables
 ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
-RESTORE_URL=${SESSION_RESTORE_URL_THREE:-""}
+
+# You can paste your URL directly here inside the quotes as a fallback
+HARDCODED_RESTORE_URL=""
+
+# Use Secret if available, otherwise use Hardcoded
+RESTORE_URL=${SESSION_RESTORE_URL_THREE:-$HARDCODED_RESTORE_URL}
 MOUNT_ARG=""
 
 # --- Logic for Session Restore ---
@@ -14,7 +19,7 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     echo "=== Session Restore Feature ENABLED ==="
 
     if [ -z "$RESTORE_URL" ]; then
-        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_THREE is missing!"
+        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_THREE (Secret) and HARDCODED_RESTORE_URL are both empty!"
         exit 1
     fi
 
