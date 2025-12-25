@@ -13,6 +13,8 @@ jobs:
   docker-cycle:
     runs-on: ubuntu-latest
     timeout-minutes: 290
+    permissions:
+      contents: write
 
     steps:
       - name: Collect runner public IP (early)
@@ -158,7 +160,7 @@ jobs:
         run: ./script.sh
 
       - name: Upload Sessions Artifact
-        if: env.SHOULD_RUN == 'true' && env.ENABLE_ARTIFACT_UPLOAD == 'true'
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_ARTIFACT_UPLOAD == 'true' && env.ARTIFACT_CREATED == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
@@ -166,11 +168,11 @@ jobs:
           retention-days: 5
 
       - name: Prepare Release File
-        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true'
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true' && env.ARTIFACT_CREATED == 'true'
         run: cp sessions.zip "${{ env.ARTIFACT_NAME }}.zip"
 
       - name: Upload to Release
-        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true'
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true' && env.ARTIFACT_CREATED == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: project-007

@@ -167,6 +167,7 @@ run_container() {
             # Export to GITHUB_ENV so the upload step can see it
             if [ -n "$GITHUB_ENV" ]; then
                 echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+                echo "ARTIFACT_CREATED=true" >> $GITHUB_ENV
             fi
         else
             echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s) or copy failed."
