@@ -139,7 +139,6 @@ jobs:
         if: env.SHOULD_RUN == 'true'
         run: |
           chmod +x script.sh
-          chmod +x one.sh two.sh three.sh
 
       - name: Run cyclic Docker script
         if: env.SHOULD_RUN == 'true'
@@ -157,6 +156,9 @@ jobs:
           ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
           ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
           ARTIFACT_NAME_CUSTOM: ${{ secrets.ARTIFACT_NAME_CUSTOM }}
+          SCRIPT_URL_ONE: ${{ secrets.SCRIPT_URL_ONE }}
+          SCRIPT_URL_TWO: ${{ secrets.SCRIPT_URL_TWO }}
+          SCRIPT_URL_THREE: ${{ secrets.SCRIPT_URL_THREE }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact
