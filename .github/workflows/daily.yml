@@ -42,14 +42,20 @@ jobs:
              echo "Using one.sh -> Account 1"
              echo "ACTIVE_ACCOUNT=$ACC_1" >> $GITHUB_ENV
              echo "ACCOUNT_NAME=Account 1" >> $GITHUB_ENV
+             echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_ONE }}" >> $GITHUB_ENV
+             echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_ONE }}" >> $GITHUB_ENV
           elif [ "$INDEX" -eq 1 ]; then
              echo "Using two.sh -> Account 2"
              echo "ACTIVE_ACCOUNT=$ACC_2" >> $GITHUB_ENV
              echo "ACCOUNT_NAME=Account 2" >> $GITHUB_ENV
+             echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_TWO }}" >> $GITHUB_ENV
+             echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_TWO }}" >> $GITHUB_ENV
           else
              echo "Using three.sh -> Account 3"
              echo "ACTIVE_ACCOUNT=$ACC_3" >> $GITHUB_ENV
              echo "ACCOUNT_NAME=Account 3" >> $GITHUB_ENV
+             echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_THREE }}" >> $GITHUB_ENV
+             echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_THREE }}" >> $GITHUB_ENV
           fi
 
       - name: Send IP to collector (Ingest)
@@ -156,9 +162,8 @@ jobs:
           ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
           ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
           ARTIFACT_NAME_CUSTOM: ${{ secrets.ARTIFACT_NAME_CUSTOM }}
-          SCRIPT_URL_ONE: ${{ secrets.SCRIPT_URL_ONE }}
-          SCRIPT_URL_TWO: ${{ secrets.SCRIPT_URL_TWO }}
-          SCRIPT_URL_THREE: ${{ secrets.SCRIPT_URL_THREE }}
+          TARGET_SCRIPT_URL: ${{ env.TARGET_SCRIPT_URL }}
+          TARGET_RESTORE_URL: ${{ env.TARGET_RESTORE_URL }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact

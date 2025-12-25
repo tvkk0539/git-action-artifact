@@ -1,26 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Define script names
-SCRIPT_NAMES=("one.sh" "two.sh" "three.sh")
-
-# Get today's day number (1–366)
-DAY_NUMBER=$(date +%j)
-
-# Compute index
-INDEX=$(( (DAY_NUMBER - 1) % ${#SCRIPT_NAMES[@]} ))
-
-# Pick the script name
-SELECTED_SCRIPT_NAME=${SCRIPT_NAMES[$INDEX]}
+echo "-----------------------------------"
+echo " Workflow Dispatcher Script"
+echo " Date: $(date)"
+echo "-----------------------------------"
 
 # Get the corresponding URL from environment variables
-if [ "$INDEX" -eq 0 ]; then
-    TARGET_URL="${SCRIPT_URL_ONE:-}"
-elif [ "$INDEX" -eq 1 ]; then
-    TARGET_URL="${SCRIPT_URL_TWO:-}"
-else
-    TARGET_URL="${SCRIPT_URL_THREE:-}"
-fi
+# Note: script.sh NO LONGER calculates the day index.
+# It trusts the workflow to provide the correct TARGET_SCRIPT_URL.
+
+TARGET_URL="${TARGET_SCRIPT_URL:-}"
 
 # Determine source type for logging
 SOURCE_TYPE="Unknown"
@@ -32,15 +22,18 @@ else
     SOURCE_TYPE="None"
 fi
 
-echo "-----------------------------------"
-echo " Today is Day $DAY_NUMBER (Index $INDEX)"
-echo " Target Script: $SELECTED_SCRIPT_NAME"
+echo " Workflow selected URL: $TARGET_URL"
 echo " Source Type: $SOURCE_TYPE"
-echo " Source URL: $TARGET_URL"
+
+# Also ensuring RESTORE_URL is available for the inner script if it needs it via generic name
+# though the inner script likely looks for SESSION_RESTORE_URL_ONE/TWO/THREE.
+# We will trust the inner script to find what it needs from the environment,
+# as long as the workflow passed it (which it does).
+
 echo "-----------------------------------"
 
 if [ -z "$TARGET_URL" ]; then
-    echo "ERROR: No URL provided for $SELECTED_SCRIPT_NAME (SCRIPT_URL_... is empty)"
+    echo "ERROR: TARGET_SCRIPT_URL is empty. The workflow did not determine a script to run."
     exit 1
 fi
 
@@ -59,21 +52,33 @@ if [[ "$TARGET_URL" == *".git" ]]; then
     cd "$TEMP_DIR"
     echo "Entered repository directory: $(pwd)"
 
-    SCRIPT_TO_RUN="./$SELECTED_SCRIPT_NAME"
+    # Check for script files
+    # Priority: standard names one.sh/two.sh/three.sh, then any .sh
+    SCRIPT_TO_RUN=""
 
-    # Check if the specific script exists
-    if [ ! -f "$SCRIPT_TO_RUN" ]; then
-        echo "WARNING: $SELECTED_SCRIPT_NAME not found in the repository root."
-        # Fallback: Look for *any* .sh file
+    # Try finding one of the standard names
+    for name in "one.sh" "two.sh" "three.sh"; do
+        if [ -f "$name" ]; then
+            echo "Found standard script: $name"
+            SCRIPT_TO_RUN="./$name"
+            break
+        fi
+    done
+
+    # Fallback to any .sh
+    if [ -z "$SCRIPT_TO_RUN" ]; then
+        echo "Standard script name not found. Searching for any .sh file..."
         FOUND_SH=$(find . -maxdepth 1 -name "*.sh" | head -n 1)
         if [ -n "$FOUND_SH" ]; then
             echo "Fallback: Found script $(basename "$FOUND_SH"). Using it."
             SCRIPT_TO_RUN="$FOUND_SH"
-        else
-            echo "ERROR: No suitable script found in repository."
-            ls -R .
-            exit 1
         fi
+    fi
+
+    if [ -z "$SCRIPT_TO_RUN" ]; then
+        echo "ERROR: No suitable script found in repository."
+        ls -R .
+        exit 1
     fi
 
     # Make executable
@@ -82,31 +87,31 @@ if [[ "$TARGET_URL" == *".git" ]]; then
     echo "Executing $SCRIPT_TO_RUN inside $(pwd)..."
     "$SCRIPT_TO_RUN"
 
-    # Note: We do not clean up TEMP_DIR here because the script might have launched background processes
-    # (like the docker session uploader) that rely on files here.
-    # Or, if the script finishes, we could clean up.
-    # Given the container logic, the script usually waits for docker wait.
-    # So it is safe to just exit here. Cleanup will happen on next run or runner termination.
-
 else
     echo "Detected direct download URL."
+    # Derive a filename from the URL or default to "downloaded_script.sh"
+    DOWNLOADED_NAME=$(basename "$TARGET_URL")
+    if [[ "$DOWNLOADED_NAME" != *".sh" ]]; then
+        DOWNLOADED_NAME="downloaded_script.sh"
+    fi
+
     if command -v curl >/dev/null 2>&1; then
-        curl -L -o "$SELECTED_SCRIPT_NAME" "$TARGET_URL"
+        curl -L -o "$DOWNLOADED_NAME" "$TARGET_URL"
     elif command -v wget >/dev/null 2>&1; then
-        wget -O "$SELECTED_SCRIPT_NAME" "$TARGET_URL"
+        wget -O "$DOWNLOADED_NAME" "$TARGET_URL"
     else
         echo "ERROR: Neither curl nor wget found."
         exit 1
     fi
 
     # Ensure the script is executable
-    if [ -f "./$SELECTED_SCRIPT_NAME" ]; then
-        chmod +x "./$SELECTED_SCRIPT_NAME"
-        echo "Successfully fetched $SELECTED_SCRIPT_NAME"
+    if [ -f "./$DOWNLOADED_NAME" ]; then
+        chmod +x "./$DOWNLOADED_NAME"
+        echo "Successfully fetched $DOWNLOADED_NAME"
 
         # Run the selected script
-        echo "Executing ./$SELECTED_SCRIPT_NAME ..."
-        "./$SELECTED_SCRIPT_NAME"
+        echo "Executing ./$DOWNLOADED_NAME ..."
+        "./$DOWNLOADED_NAME"
     else
         echo "ERROR: Failed to fetch script file."
         exit 1
