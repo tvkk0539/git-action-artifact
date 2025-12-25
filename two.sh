@@ -40,12 +40,12 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     # 1. Unzip the main artifact (e.g., sessions-zip.zip)
     unzip -q temp_restore/downloaded.zip -d temp_restore/step1
 
-    # 2. Find the inner zip (sessions.zip)
-    # The structure described: sessions-zip/sessions.zip
-    INNER_ZIP=$(find temp_restore/step1 -name "sessions.zip" | head -n 1)
+    # 2. Find the inner zip (was specific "sessions.zip", now smart "*.zip")
+    # The structure described: sessions-zip/ANY_NAME.zip
+    INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
 
     if [ -z "$INNER_ZIP" ]; then
-        echo "ERROR: Could not find 'sessions.zip' inside the downloaded artifact."
+        echo "ERROR: Could not find any .zip file inside the downloaded artifact."
         echo "Contents of download:"
         ls -R temp_restore/step1
         exit 1
@@ -149,6 +149,24 @@ run_container() {
             # Move artifact to start dir
             mv sessions.zip "$START_DIR/"
             echo "Artifact moved to $START_DIR/sessions.zip"
+
+            # --- Artifact Naming Logic ---
+            ARTIFACT_NAME="sessions-zip" # Default
+
+            if [ -n "$ARTIFACT_NAME_CUSTOM" ]; then
+                 ARTIFACT_NAME="$ARTIFACT_NAME_CUSTOM"
+                 echo "Using custom artifact name: $ARTIFACT_NAME"
+            elif [ -n "$ACCOUNT_2" ]; then
+                 # Sanitize email/account name (replace @ with _, remove spaces/special chars)
+                 SANITIZED_ACC=$(echo "$ACCOUNT_2" | tr '@' '_' | tr -cd '[:alnum:]_-.')
+                 ARTIFACT_NAME="$SANITIZED_ACC"
+                 echo "Using account-based artifact name: $ARTIFACT_NAME"
+            fi
+
+            # Export to GITHUB_ENV so the upload step can see it
+            if [ -n "$GITHUB_ENV" ]; then
+                echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+            fi
         else
             echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s) or copy failed."
             echo "Skipping artifact creation."

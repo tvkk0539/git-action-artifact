@@ -17,7 +17,11 @@ This project automates the deployment and execution of Docker containers for spe
 ### 1. Automatic Sessions Extraction
 The scripts are designed to extract valuable session data from the running container.
 *   **How it works**: When the container starts, a background timer starts. After a specified delay, the script copies the `/usr/src/microsoft-rewards-script/dist/browser/sessions` folder from the container to the host.
-*   **Artifact Upload**: In GitHub Actions, this folder is zipped (`sessions.zip`) and uploaded as a build artifact, allowing you to download and inspect the sessions later.
+*   **Artifact Upload**: In GitHub Actions, this folder is zipped (`sessions.zip`) and uploaded as a build artifact.
+    *   **Dynamic Naming**: The artifact name is automatically determined:
+        1.  `ARTIFACT_NAME_CUSTOM` (if provided).
+        2.  `ACCOUNT_1` / `ACCOUNT_2` / `ACCOUNT_3` (sanitized email from secrets).
+        3.  Default: `sessions-zip`.
 
 ### 2. Session Restore (New)
 You can restore a previously saved sessions folder into the container at startup.
@@ -44,6 +48,7 @@ You can configure the behavior using Environment Variables.
 | `ENABLE_SESSION_UPLOAD`| Set to `true` to enable session artifact upload. Set to `false` to disable. | `false` (in script), `true` (in workflow) |
 | `ENABLE_SESSION_RESTORE`| Set to `true` to enable session restore. | `false` |
 | `SESSION_RESTORE_URL_...`| URL to download the sessions zip (ONE, TWO, or THREE). | `""` |
+| `ARTIFACT_NAME_CUSTOM` | Custom name for the uploaded artifact. | `""` (Uses Account Email or Default) |
 | `SESSION_COPY_DELAY` | Time in seconds to wait after container start before copying the sessions folder. | `300` (5 minutes) |
 | `MIN_SLEEP_MINUTES` | passed to container | `1` |
 | `MAX_SLEEP_MINUTES` | passed to container | `2` |
