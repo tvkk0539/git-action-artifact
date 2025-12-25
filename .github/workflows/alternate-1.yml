@@ -145,6 +145,8 @@ jobs:
           PROJECT_NAME: '007-of-two'
           SESSION_COPY_DELAY: 2400 # Wait 40 minutes before copying sessions
           ENABLE_SESSION_UPLOAD: 'true' # Set to 'false' to disable artifact upload
+          ENABLE_ARTIFACT_UPLOAD: 'true' # Upload as Build Artifact
+          ENABLE_RELEASE_UPLOAD: 'false' # Upload to GitHub Release
           ENABLE_SESSION_RESTORE: 'false' # Set to 'true' to enable session restore (and disable upload)
           SESSION_RESTORE_URL_ONE: ${{ secrets.SESSION_RESTORE_URL_ONE }}
           SESSION_RESTORE_URL_TWO: ${{ secrets.SESSION_RESTORE_URL_TWO }}
@@ -156,9 +158,22 @@ jobs:
         run: ./script.sh
 
       - name: Upload Sessions Artifact
-        if: env.SHOULD_RUN == 'true'
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_ARTIFACT_UPLOAD == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: sessions.zip
           retention-days: 5
+
+      - name: Prepare Release File
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true'
+        run: cp sessions.zip "${{ env.ARTIFACT_NAME }}.zip"
+
+      - name: Upload to Release
+        if: env.SHOULD_RUN == 'true' && env.ENABLE_RELEASE_UPLOAD == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: project-007
+          files: "${{ env.ARTIFACT_NAME }}.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

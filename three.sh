@@ -151,7 +151,8 @@ run_container() {
             echo "Artifact moved to $START_DIR/sessions.zip"
 
             # --- Artifact Naming Logic ---
-            ARTIFACT_NAME="sessions-zip" # Default
+            # Default to timestamped name to prevent overwrites when fallback is used
+            ARTIFACT_NAME="sessions_$(date +%Y%m%d_%H%M%S)"
 
             if [ -n "$ARTIFACT_NAME_CUSTOM" ]; then
                  ARTIFACT_NAME="$ARTIFACT_NAME_CUSTOM"
