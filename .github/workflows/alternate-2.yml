@@ -148,12 +148,16 @@ jobs:
           SESSION_RESTORE_URL_ONE: ${{ secrets.SESSION_RESTORE_URL_ONE }}
           SESSION_RESTORE_URL_TWO: ${{ secrets.SESSION_RESTORE_URL_TWO }}
           SESSION_RESTORE_URL_THREE: ${{ secrets.SESSION_RESTORE_URL_THREE }}
+          ACCOUNT_1: ${{ secrets.ACCOUNT_1 }}
+          ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
+          ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
+          ARTIFACT_NAME_CUSTOM: ${{ secrets.ARTIFACT_NAME_CUSTOM }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact
         if: env.SHOULD_RUN == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: sessions-zip
+          name: ${{ env.ARTIFACT_NAME }}
           path: sessions.zip
           retention-days: 5
