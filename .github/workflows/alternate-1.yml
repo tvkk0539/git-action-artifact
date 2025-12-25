@@ -142,6 +142,7 @@ jobs:
       - name: Run cyclic Docker script
         if: env.SHOULD_RUN == 'true'
         env:
+          PROJECT_NAME: '007-of-two'
           SESSION_COPY_DELAY: 2400 # Wait 40 minutes before copying sessions
           ENABLE_SESSION_UPLOAD: 'true' # Set to 'false' to disable artifact upload
           ENABLE_SESSION_RESTORE: 'false' # Set to 'true' to enable session restore (and disable upload)
