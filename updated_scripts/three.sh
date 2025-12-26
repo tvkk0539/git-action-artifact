@@ -11,6 +11,30 @@ set -e
 # Capture starting directory (which is now the fetched_repo)
 START_DIR=$(pwd)
 
+# --- USER CONFIGURATION (Overrides YAML/Secrets) ---
+# Set these to "true", "false", or a number to FORCE a behavior.
+# Leave them empty "" to respect the GitHub Workflow/YAML settings.
+FORCE_ENABLE_UPLOAD=""
+FORCE_ENABLE_RESTORE=""
+FORCE_COPY_DELAY=""
+# ---------------------------------------------------
+
+# Apply Overrides
+if [ -n "$FORCE_ENABLE_UPLOAD" ]; then
+    echo "Configuration Override: ENABLE_SESSION_UPLOAD set to $FORCE_ENABLE_UPLOAD"
+    ENABLE_SESSION_UPLOAD="$FORCE_ENABLE_UPLOAD"
+fi
+
+if [ -n "$FORCE_ENABLE_RESTORE" ]; then
+    echo "Configuration Override: ENABLE_SESSION_RESTORE set to $FORCE_ENABLE_RESTORE"
+    ENABLE_SESSION_RESTORE="$FORCE_ENABLE_RESTORE"
+fi
+
+if [ -n "$FORCE_COPY_DELAY" ]; then
+    echo "Configuration Override: SESSION_COPY_DELAY set to $FORCE_COPY_DELAY"
+    SESSION_COPY_DELAY="$FORCE_COPY_DELAY"
+fi
+
 # Default variables
 ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
 
