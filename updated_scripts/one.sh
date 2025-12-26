@@ -192,7 +192,7 @@ run_container() {
                  echo "Using custom artifact name: $ARTIFACT_NAME"
             elif [ -n "$ACCOUNT_1" ]; then
                  # Sanitize email/account name (replace @ with _, remove spaces/special chars)
-                 SANITIZED_ACC=$(echo "$ACCOUNT_1" | tr '@' '_' | tr -cd '[:alnum:]_-.')
+                 SANITIZED_ACC=$(echo "$ACCOUNT_1" | tr '@' '_' | tr -cd '[:alnum:]_.-')
                  ARTIFACT_NAME="$SANITIZED_ACC"
                  echo "Using account-based artifact name: $ARTIFACT_NAME"
             fi
