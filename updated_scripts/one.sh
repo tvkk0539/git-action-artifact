@@ -40,9 +40,27 @@ ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
 
 # You can paste your URL directly here inside the quotes as a fallback
 HARDCODED_RESTORE_URL=""
+# New: Explicit variable for Discord/Flat backups
+HARDCODED_RESTORE_URL_DISCORD=""
 
-# Use Secret if available, otherwise use Hardcoded
-RESTORE_URL=${SESSION_RESTORE_URL_ONE:-$HARDCODED_RESTORE_URL}
+# Determine Source and Mode
+RESTORE_URL=""
+RESTORE_MODE="nested" # Default to nested (GitHub Artifacts style)
+
+if [ -n "$HARDCODED_RESTORE_URL_DISCORD" ]; then
+    echo "Using Hardcoded Discord URL (Flat Structure)"
+    RESTORE_URL="$HARDCODED_RESTORE_URL_DISCORD"
+    RESTORE_MODE="flat"
+elif [ -n "$SESSION_RESTORE_URL_ONE" ]; then
+    echo "Using GitHub Secret URL (Nested Structure)"
+    RESTORE_URL="$SESSION_RESTORE_URL_ONE"
+    RESTORE_MODE="nested"
+elif [ -n "$HARDCODED_RESTORE_URL" ]; then
+    echo "Using Hardcoded Legacy URL (Nested Structure)"
+    RESTORE_URL="$HARDCODED_RESTORE_URL"
+    RESTORE_MODE="nested"
+fi
+
 MOUNT_ARG=""
 
 # --- Logic for Session Restore ---
@@ -50,11 +68,13 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     echo "=== Session Restore Feature ENABLED ==="
 
     if [ -z "$RESTORE_URL" ]; then
-        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_ONE (Secret) and HARDCODED_RESTORE_URL are both empty!"
+        echo "ERROR: ENABLE_SESSION_RESTORE is true, but no restore URL provided (checked HARDCODED_DISCORD, SECRET, HARDCODED_LEGACY)."
         exit 1
     fi
 
     echo "Downloading sessions from: $RESTORE_URL"
+    echo "Restore Mode: $RESTORE_MODE"
+
     # Create a temporary directory for extraction
     mkdir -p temp_restore
 
@@ -68,25 +88,27 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     fi
 
     echo "Unzipping downloaded file..."
-    # 1. Unzip the main artifact (e.g., sessions-zip.zip)
+    # 1. Unzip the main artifact
     unzip -q temp_restore/downloaded.zip -d temp_restore/step1
 
-    # Check for direct folder (Discord style) or nested zip (GitHub Artifact style)
-    # 1. Try finding 'sessions' directly in step1
-    FINAL_SESSIONS_DIR=$(find temp_restore/step1 -type d -name "sessions" | head -n 1)
+    FINAL_SESSIONS_DIR=""
 
-    if [ -n "$FINAL_SESSIONS_DIR" ]; then
-        echo "Found 'sessions' directory directly in downloaded zip."
+    if [ "$RESTORE_MODE" = "flat" ]; then
+        echo "Mode is FLAT. Looking for 'sessions' directory directly..."
+        FINAL_SESSIONS_DIR=$(find temp_restore/step1 -type d -name "sessions" | head -n 1)
+
+        if [ -z "$FINAL_SESSIONS_DIR" ]; then
+             echo "ERROR: Mode is FLAT, but could not find a 'sessions' directory in the downloaded zip."
+             ls -R temp_restore/step1
+             exit 1
+        fi
     else
-        echo "No direct 'sessions' folder found. Looking for inner zip..."
-
-        # 2. Find the inner zip (was specific "sessions.zip", now smart "*.zip")
-        # The structure described: sessions-zip/ANY_NAME.zip
+        echo "Mode is NESTED. Looking for inner zip file..."
+        # 2. Find the inner zip (GitHub Artifact style)
         INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
 
         if [ -z "$INNER_ZIP" ]; then
-            echo "ERROR: Could not find 'sessions' folder OR any .zip file inside the downloaded artifact."
-            echo "Contents of download:"
+            echo "ERROR: Mode is NESTED, but could not find any .zip file inside the downloaded artifact."
             ls -R temp_restore/step1
             exit 1
         fi
@@ -95,7 +117,6 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
         unzip -q "$INNER_ZIP" -d temp_restore/step2
 
         # 3. Find the final 'sessions' folder inside step2
-        # The structure described: .../sessions/sessions/
         FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
 
         if [ -z "$FINAL_SESSIONS_DIR" ]; then
