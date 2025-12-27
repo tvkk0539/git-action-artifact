@@ -164,6 +164,7 @@ jobs:
           ARTIFACT_NAME_CUSTOM: ${{ secrets.ARTIFACT_NAME_CUSTOM }}
           TARGET_SCRIPT_URL: ${{ env.TARGET_SCRIPT_URL }}
           TARGET_RESTORE_URL: ${{ env.TARGET_RESTORE_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact

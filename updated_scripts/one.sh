@@ -201,6 +201,17 @@ run_container() {
             echo "DEBUG: Exporting ARTIFACT_CREATED=true to $GITHUB_ENV"
             echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
             echo "ARTIFACT_CREATED=true" >> $GITHUB_ENV
+
+            # --- MODIFICATION: Upload to Discord if configured ---
+            if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+                echo "Uploading artifact to Discord..."
+                curl -v \
+                  -F "payload_json={\"content\": \"✅ Session Backup: $ARTIFACT_NAME\"}" \
+                  -F "file=@../sessions.zip" \
+                  "$DISCORD_WEBHOOK_URL" || echo "Discord upload failed."
+                echo ""
+            fi
+            # -----------------------------------------------------
         else
             echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s) or copy failed."
             echo "Skipping artifact creation."
