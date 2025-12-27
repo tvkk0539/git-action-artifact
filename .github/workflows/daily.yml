@@ -161,7 +161,6 @@ jobs:
           ACCOUNT_1: ${{ secrets.ACCOUNT_1 }}
           ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
           ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
-          ARTIFACT_NAME_CUSTOM: ${{ secrets.ARTIFACT_NAME_CUSTOM }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: ./script.sh
 

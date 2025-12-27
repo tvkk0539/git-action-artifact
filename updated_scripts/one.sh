@@ -43,6 +43,12 @@ HARDCODED_RESTORE_URL=""
 # New: Explicit variable for Discord/Flat backups
 HARDCODED_RESTORE_URL_DISCORD=""
 
+# --- CUSTOM ARTIFACT NAME (Overrides everything) ---
+# Set your desired artifact name here.
+# If left empty, it will default to a timestamped name.
+CUSTOM_ARTIFACT_NAME=""
+# ---------------------------------------------------
+
 # Determine Source and Mode
 RESTORE_URL=""
 RESTORE_MODE="nested" # Default to nested (GitHub Artifacts style)
@@ -215,17 +221,13 @@ run_container() {
             # -----------------------------------------------------------------
 
             # --- Artifact Naming Logic ---
-            # Default to timestamped name to prevent overwrites when fallback is used
+            # Default to timestamped name
             ARTIFACT_NAME="sessions_$(date +%Y%m%d_%H%M%S)"
 
-            if [ -n "$ARTIFACT_NAME_CUSTOM" ]; then
-                 ARTIFACT_NAME="$ARTIFACT_NAME_CUSTOM"
-                 echo "Using custom artifact name: $ARTIFACT_NAME"
-            elif [ -n "$ACCOUNT_1" ]; then
-                 # Sanitize email/account name (replace @ with _, remove spaces/special chars)
-                 SANITIZED_ACC=$(echo "$ACCOUNT_1" | tr '@' '_' | tr -cd '[:alnum:]_.-')
-                 ARTIFACT_NAME="$SANITIZED_ACC"
-                 echo "Using account-based artifact name: $ARTIFACT_NAME"
+            # Use local CUSTOM_ARTIFACT_NAME if set
+            if [ -n "$CUSTOM_ARTIFACT_NAME" ]; then
+                 ARTIFACT_NAME="$CUSTOM_ARTIFACT_NAME"
+                 echo "Using custom artifact name from script: $ARTIFACT_NAME"
             fi
 
             # Export to GITHUB_ENV so the upload step can see it
