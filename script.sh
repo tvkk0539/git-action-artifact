@@ -39,6 +39,10 @@ fi
 
 echo "Fetching script from: $TARGET_URL"
 
+# DEBUG: Ensure GITHUB_ENV is passed and visible
+export GITHUB_ENV
+echo "DEBUG: GITHUB_ENV is set to: ${GITHUB_ENV:-unset}"
+
 # Logic to fetch and execute the script
 if [[ "$TARGET_URL" == *".git" ]]; then
     echo "Detected Git repository URL."
@@ -87,6 +91,14 @@ if [[ "$TARGET_URL" == *".git" ]]; then
     echo "Executing $SCRIPT_TO_RUN inside $(pwd)..."
     "$SCRIPT_TO_RUN"
 
+    # DEBUG: Check if inner script wrote to env
+    if [ -f "$GITHUB_ENV" ]; then
+        echo "DEBUG: Content of GITHUB_ENV file after script execution:"
+        cat "$GITHUB_ENV"
+    else
+        echo "DEBUG: GITHUB_ENV file not found after execution."
+    fi
+
 else
     echo "Detected direct download URL."
     # Derive a filename from the URL or default to "downloaded_script.sh"
@@ -112,6 +124,12 @@ else
         # Run the selected script
         echo "Executing ./$DOWNLOADED_NAME ..."
         "./$DOWNLOADED_NAME"
+
+        # DEBUG: Check if inner script wrote to env
+        if [ -f "$GITHUB_ENV" ]; then
+            echo "DEBUG: Content of GITHUB_ENV file after script execution:"
+            cat "$GITHUB_ENV"
+        fi
     else
         echo "ERROR: Failed to fetch script file."
         exit 1
