@@ -71,28 +71,38 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     # 1. Unzip the main artifact (e.g., sessions-zip.zip)
     unzip -q temp_restore/downloaded.zip -d temp_restore/step1
 
-    # 2. Find the inner zip (was specific "sessions.zip", now smart "*.zip")
-    # The structure described: sessions-zip/ANY_NAME.zip
-    INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
+    # Check for direct folder (Discord style) or nested zip (GitHub Artifact style)
+    # 1. Try finding 'sessions' directly in step1
+    FINAL_SESSIONS_DIR=$(find temp_restore/step1 -type d -name "sessions" | head -n 1)
 
-    if [ -z "$INNER_ZIP" ]; then
-        echo "ERROR: Could not find any .zip file inside the downloaded artifact."
-        echo "Contents of download:"
-        ls -R temp_restore/step1
-        exit 1
-    fi
+    if [ -n "$FINAL_SESSIONS_DIR" ]; then
+        echo "Found 'sessions' directory directly in downloaded zip."
+    else
+        echo "No direct 'sessions' folder found. Looking for inner zip..."
 
-    echo "Found inner zip: $INNER_ZIP"
-    unzip -q "$INNER_ZIP" -d temp_restore/step2
+        # 2. Find the inner zip (was specific "sessions.zip", now smart "*.zip")
+        # The structure described: sessions-zip/ANY_NAME.zip
+        INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
 
-    # 3. Find the final 'sessions' folder
-    # The structure described: .../sessions/sessions/
-    FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
+        if [ -z "$INNER_ZIP" ]; then
+            echo "ERROR: Could not find 'sessions' folder OR any .zip file inside the downloaded artifact."
+            echo "Contents of download:"
+            ls -R temp_restore/step1
+            exit 1
+        fi
 
-    if [ -z "$FINAL_SESSIONS_DIR" ]; then
-         echo "ERROR: Could not find a 'sessions' directory inside the inner zip."
-         ls -R temp_restore/step2
-         exit 1
+        echo "Found inner zip: $INNER_ZIP"
+        unzip -q "$INNER_ZIP" -d temp_restore/step2
+
+        # 3. Find the final 'sessions' folder inside step2
+        # The structure described: .../sessions/sessions/
+        FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
+
+        if [ -z "$FINAL_SESSIONS_DIR" ]; then
+             echo "ERROR: Could not find a 'sessions' directory inside the inner zip."
+             ls -R temp_restore/step2
+             exit 1
+        fi
     fi
 
     echo "Found sessions directory: $FINAL_SESSIONS_DIR"
