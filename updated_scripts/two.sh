@@ -1,17 +1,95 @@
 #!/usr/bin/env bash
 set -e
 
-# Capture starting directory
+# --- MODIFICATION START: "Clone Once" Compatibility ---
+# This script has been modified to work with the new script.sh "Clone Once" logic.
+# 1. Removed `git clone`.
+# 2. Removed `cd /tmp/repo`.
+# 3. Artifact moves to `../` (Runner Root) instead of `$START_DIR` (Repo Root).
+# ------------------------------------------------------
+
+# Capture starting directory (which is now the fetched_repo)
 START_DIR=$(pwd)
+
+# --- USER CONFIGURATION (Overrides YAML/Secrets) ---
+# Set these to "true", "false", or a number to FORCE a behavior.
+# Leave them empty "" to respect the GitHub Workflow/YAML settings.
+FORCE_ENABLE_UPLOAD=""
+FORCE_ENABLE_RESTORE=""
+FORCE_COPY_DELAY=""
+# ---------------------------------------------------
+
+# Apply Overrides
+if [ -n "$FORCE_ENABLE_UPLOAD" ]; then
+    echo "Configuration Override: ENABLE_SESSION_UPLOAD set to $FORCE_ENABLE_UPLOAD"
+    ENABLE_SESSION_UPLOAD="$FORCE_ENABLE_UPLOAD"
+fi
+
+if [ -n "$FORCE_ENABLE_RESTORE" ]; then
+    echo "Configuration Override: ENABLE_SESSION_RESTORE set to $FORCE_ENABLE_RESTORE"
+    ENABLE_SESSION_RESTORE="$FORCE_ENABLE_RESTORE"
+fi
+
+if [ -n "$FORCE_COPY_DELAY" ]; then
+    echo "Configuration Override: SESSION_COPY_DELAY set to $FORCE_COPY_DELAY"
+    SESSION_COPY_DELAY="$FORCE_COPY_DELAY"
+fi
 
 # Default variables
 ENABLE_RESTORE=${ENABLE_SESSION_RESTORE:-false}
 
 # You can paste your URL directly here inside the quotes as a fallback
 HARDCODED_RESTORE_URL=""
+# New: Explicit variable for Discord/Flat backups
+HARDCODED_RESTORE_URL_DISCORD=""
 
-# Use Secret if available, otherwise use Hardcoded
-RESTORE_URL=${SESSION_RESTORE_URL_TWO:-$HARDCODED_RESTORE_URL}
+# --- CUSTOM ARTIFACT NAME (Overrides everything) ---
+# Set your desired artifact name here.
+# If left empty, it will default to a timestamped name.
+CUSTOM_ARTIFACT_NAME=""
+# ---------------------------------------------------
+
+# --- SECRET OVERRIDES (Overrides GitHub Secrets) ---
+# Fill these to hardcode credentials inside the script, ignoring the Workflow Secrets.
+OVERRIDE_ACCOUNT_2=""
+OVERRIDE_DISCORD_WEBHOOK_URL=""
+# ---------------------------------------------------
+
+# Apply Overrides
+if [ -n "$OVERRIDE_ACCOUNT_2" ]; then
+    echo "Using Hardcoded Account 2 Override"
+    ACCOUNT_2="$OVERRIDE_ACCOUNT_2"
+fi
+
+if [ -n "$OVERRIDE_DISCORD_WEBHOOK_URL" ]; then
+    echo "Using Hardcoded Discord Webhook Override"
+    DISCORD_WEBHOOK_URL="$OVERRIDE_DISCORD_WEBHOOK_URL"
+fi
+
+# Determine Source and Mode
+RESTORE_URL=""
+RESTORE_MODE="nested" # Default to nested (GitHub Artifacts style)
+
+# Priority:
+# 1. HARDCODED_RESTORE_URL_DISCORD (Flat Override)
+# 2. HARDCODED_RESTORE_URL (Nested Override - moved UP in priority)
+# 3. SESSION_RESTORE_URL_TWO (Secret)
+
+if [ -n "$HARDCODED_RESTORE_URL_DISCORD" ]; then
+    echo "Using Hardcoded Discord URL (Flat Structure)"
+    RESTORE_URL="$HARDCODED_RESTORE_URL_DISCORD"
+    RESTORE_MODE="flat"
+elif [ -n "$HARDCODED_RESTORE_URL" ]; then
+    # Moved up to act as an Override for Nested Mode
+    echo "Using Hardcoded Legacy URL (Nested Structure)"
+    RESTORE_URL="$HARDCODED_RESTORE_URL"
+    RESTORE_MODE="nested"
+elif [ -n "$SESSION_RESTORE_URL_TWO" ]; then
+    echo "Using GitHub Secret URL (Nested Structure)"
+    RESTORE_URL="$SESSION_RESTORE_URL_TWO"
+    RESTORE_MODE="nested"
+fi
+
 MOUNT_ARG=""
 
 # --- Logic for Session Restore ---
@@ -19,11 +97,13 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     echo "=== Session Restore Feature ENABLED ==="
 
     if [ -z "$RESTORE_URL" ]; then
-        echo "ERROR: ENABLE_SESSION_RESTORE is true, but SESSION_RESTORE_URL_TWO (Secret) and HARDCODED_RESTORE_URL are both empty!"
+        echo "ERROR: ENABLE_SESSION_RESTORE is true, but no restore URL provided (checked HARDCODED_DISCORD, SECRET, HARDCODED_LEGACY)."
         exit 1
     fi
 
     echo "Downloading sessions from: $RESTORE_URL"
+    echo "Restore Mode: $RESTORE_MODE"
+
     # Create a temporary directory for extraction
     mkdir -p temp_restore
 
@@ -37,31 +117,42 @@ if [ "$ENABLE_RESTORE" = "true" ]; then
     fi
 
     echo "Unzipping downloaded file..."
-    # 1. Unzip the main artifact (e.g., sessions-zip.zip)
+    # 1. Unzip the main artifact
     unzip -q temp_restore/downloaded.zip -d temp_restore/step1
 
-    # 2. Find the inner zip (was specific "sessions.zip", now smart "*.zip")
-    # The structure described: sessions-zip/ANY_NAME.zip
-    INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
+    FINAL_SESSIONS_DIR=""
 
-    if [ -z "$INNER_ZIP" ]; then
-        echo "ERROR: Could not find any .zip file inside the downloaded artifact."
-        echo "Contents of download:"
-        ls -R temp_restore/step1
-        exit 1
-    fi
+    if [ "$RESTORE_MODE" = "flat" ]; then
+        echo "Mode is FLAT. Looking for 'sessions' directory directly..."
+        FINAL_SESSIONS_DIR=$(find temp_restore/step1 -type d -name "sessions" | head -n 1)
 
-    echo "Found inner zip: $INNER_ZIP"
-    unzip -q "$INNER_ZIP" -d temp_restore/step2
+        if [ -z "$FINAL_SESSIONS_DIR" ]; then
+             echo "ERROR: Mode is FLAT, but could not find a 'sessions' directory in the downloaded zip."
+             ls -R temp_restore/step1
+             exit 1
+        fi
+    else
+        echo "Mode is NESTED. Looking for inner zip file..."
+        # 2. Find the inner zip (GitHub Artifact style)
+        INNER_ZIP=$(find temp_restore/step1 -name "*.zip" | head -n 1)
 
-    # 3. Find the final 'sessions' folder
-    # The structure described: .../sessions/sessions/
-    FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
+        if [ -z "$INNER_ZIP" ]; then
+            echo "ERROR: Mode is NESTED, but could not find any .zip file inside the downloaded artifact."
+            ls -R temp_restore/step1
+            exit 1
+        fi
 
-    if [ -z "$FINAL_SESSIONS_DIR" ]; then
-         echo "ERROR: Could not find a 'sessions' directory inside the inner zip."
-         ls -R temp_restore/step2
-         exit 1
+        echo "Found inner zip: $INNER_ZIP"
+        unzip -q "$INNER_ZIP" -d temp_restore/step2
+
+        # 3. Find the final 'sessions' folder inside step2
+        FINAL_SESSIONS_DIR=$(find temp_restore/step2 -type d -name "sessions" | head -n 1)
+
+        if [ -z "$FINAL_SESSIONS_DIR" ]; then
+             echo "ERROR: Could not find a 'sessions' directory inside the inner zip."
+             ls -R temp_restore/step2
+             exit 1
+        fi
     fi
 
     echo "Found sessions directory: $FINAL_SESSIONS_DIR"
@@ -146,29 +237,37 @@ run_container() {
                 tar -czf sessions.zip sessions
             fi
 
-            # Move artifact to start dir
-            mv sessions.zip "$START_DIR/"
-            echo "Artifact moved to $START_DIR/sessions.zip"
+            # --- MODIFICATION: Move Artifact to Runner Root (Up one level) ---
+            # Was: mv sessions.zip "$START_DIR/"
+            mv sessions.zip ../
+            echo "Artifact moved to runner root (../sessions.zip)"
+            # -----------------------------------------------------------------
 
             # --- Artifact Naming Logic ---
-            # Default to timestamped name to prevent overwrites when fallback is used
+            # Default to timestamped name
             ARTIFACT_NAME="sessions_$(date +%Y%m%d_%H%M%S)"
 
-            if [ -n "$ARTIFACT_NAME_CUSTOM" ]; then
-                 ARTIFACT_NAME="$ARTIFACT_NAME_CUSTOM"
-                 echo "Using custom artifact name: $ARTIFACT_NAME"
-            elif [ -n "$ACCOUNT_2" ]; then
-                 # Sanitize email/account name (replace @ with _, remove spaces/special chars)
-                 SANITIZED_ACC=$(echo "$ACCOUNT_2" | tr '@' '_' | tr -cd '[:alnum:]_-.')
-                 ARTIFACT_NAME="$SANITIZED_ACC"
-                 echo "Using account-based artifact name: $ARTIFACT_NAME"
+            # Use local CUSTOM_ARTIFACT_NAME if set
+            if [ -n "$CUSTOM_ARTIFACT_NAME" ]; then
+                 ARTIFACT_NAME="$CUSTOM_ARTIFACT_NAME"
+                 echo "Using custom artifact name from script: $ARTIFACT_NAME"
             fi
 
             # Export to GITHUB_ENV so the upload step can see it
-            if [ -n "$GITHUB_ENV" ]; then
-                echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
-                echo "ARTIFACT_CREATED=true" >> $GITHUB_ENV
+            echo "DEBUG: Exporting ARTIFACT_CREATED=true to $GITHUB_ENV"
+            echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
+            echo "ARTIFACT_CREATED=true" >> $GITHUB_ENV
+
+            # --- MODIFICATION: Upload to Discord if configured ---
+            if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+                echo "Uploading artifact to Discord..."
+                curl -v \
+                  -F "payload_json={\"content\": \"✅ Session Backup: $ARTIFACT_NAME\"}" \
+                  -F "file=@../sessions.zip" \
+                  "$DISCORD_WEBHOOK_URL" || echo "Discord upload failed."
+                echo ""
             fi
+            # -----------------------------------------------------
         else
             echo "Sessions folder NOT found. Container finished before copy delay ($SESSION_COPY_DELAY s) or copy failed."
             echo "Skipping artifact creation."
@@ -183,9 +282,11 @@ run_container() {
     rm -rf final_sessions
 }
 
-# Clone target repo
-git clone https://fredsuiopaweszxkguqopzx-admin@bitbucket.org/fredsuiopaweszxkguqopzxes/us-ac-v1-007-of-two.git /tmp/repo
-cd /tmp/repo
+# --- MODIFICATION: Removed Git Clone ---
+# Was: git clone ...
+# Was: cd /tmp/repo
+# Now: We assume we are already in the correct directory.
+# ---------------------------------------
 
 # Extract base image from Dockerfile
 if [ ! -f "Dockerfile" ]; then
