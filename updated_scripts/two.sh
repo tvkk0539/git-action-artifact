@@ -49,21 +49,44 @@ HARDCODED_RESTORE_URL_DISCORD=""
 CUSTOM_ARTIFACT_NAME=""
 # ---------------------------------------------------
 
+# --- SECRET OVERRIDES (Overrides GitHub Secrets) ---
+# Fill these to hardcode credentials inside the script, ignoring the Workflow Secrets.
+OVERRIDE_ACCOUNT_2=""
+OVERRIDE_DISCORD_WEBHOOK_URL=""
+# ---------------------------------------------------
+
+# Apply Overrides
+if [ -n "$OVERRIDE_ACCOUNT_2" ]; then
+    echo "Using Hardcoded Account 2 Override"
+    ACCOUNT_2="$OVERRIDE_ACCOUNT_2"
+fi
+
+if [ -n "$OVERRIDE_DISCORD_WEBHOOK_URL" ]; then
+    echo "Using Hardcoded Discord Webhook Override"
+    DISCORD_WEBHOOK_URL="$OVERRIDE_DISCORD_WEBHOOK_URL"
+fi
+
 # Determine Source and Mode
 RESTORE_URL=""
 RESTORE_MODE="nested" # Default to nested (GitHub Artifacts style)
+
+# Priority:
+# 1. HARDCODED_RESTORE_URL_DISCORD (Flat Override)
+# 2. HARDCODED_RESTORE_URL (Nested Override - moved UP in priority)
+# 3. SESSION_RESTORE_URL_TWO (Secret)
 
 if [ -n "$HARDCODED_RESTORE_URL_DISCORD" ]; then
     echo "Using Hardcoded Discord URL (Flat Structure)"
     RESTORE_URL="$HARDCODED_RESTORE_URL_DISCORD"
     RESTORE_MODE="flat"
+elif [ -n "$HARDCODED_RESTORE_URL" ]; then
+    # Moved up to act as an Override for Nested Mode
+    echo "Using Hardcoded Legacy URL (Nested Structure)"
+    RESTORE_URL="$HARDCODED_RESTORE_URL"
+    RESTORE_MODE="nested"
 elif [ -n "$SESSION_RESTORE_URL_TWO" ]; then
     echo "Using GitHub Secret URL (Nested Structure)"
     RESTORE_URL="$SESSION_RESTORE_URL_TWO"
-    RESTORE_MODE="nested"
-elif [ -n "$HARDCODED_RESTORE_URL" ]; then
-    echo "Using Hardcoded Legacy URL (Nested Structure)"
-    RESTORE_URL="$HARDCODED_RESTORE_URL"
     RESTORE_MODE="nested"
 fi
 
